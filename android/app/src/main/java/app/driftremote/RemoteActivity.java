@@ -57,6 +57,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         presser = new Presser(this::sendKey);
 
         findViewById(R.id.close).setOnClickListener(v -> finish());
+        findViewById(R.id.tvName).setOnClickListener(v -> Ui.showAbout(this));
 
         presser.bind(power, Keys.POWER, false);
         presser.bind(findViewById(R.id.input), Keys.TV_INPUT, false);
@@ -400,6 +401,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
         holder[0] = new AlertDialog.Builder(this).setTitle("More buttons").setView(sv)
+                .setNeutralButton("About", (d, w) -> Ui.showAbout(this))
                 .setNegativeButton("Close", null).show();
     }
 

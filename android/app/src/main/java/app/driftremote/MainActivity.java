@@ -33,6 +33,7 @@ public class MainActivity extends Activity implements Discovery.Listener {
         status = findViewById(R.id.status);
         ((TextView) findViewById(R.id.credit)).setText(
                 "Developed by " + getString(R.string.developer) + "  ·  Version " + BuildConfig.VERSION_NAME);
+        findViewById(R.id.credit).setOnClickListener(v -> Ui.showAbout(this));
         discovery = new Discovery(this, this);
         findViewById(R.id.add).setOnClickListener(v -> askForAddress());
         findViewById(R.id.refresh).setOnClickListener(v -> {
