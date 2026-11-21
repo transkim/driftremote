@@ -70,4 +70,13 @@
         android:textAllCaps="false"
         android:textColor="#FF0E1215"
         android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/credit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
+        android:textColor="@color/muted"
+        android:textSize="12sp" />
 </LinearLayout>

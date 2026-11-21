@@ -1,5 +1,7 @@
 # Driftremote
 
+Developed by **Hajj Abdul Hakim**.
+
 A phone remote for Android TV and Google TV over your home Wi-Fi. No ADB, no developer mode, and nothing to install on the TV: it talks to the remote service that is already built into every Android TV / Google TV (Hisense, Sony, TCL, Philips, Xiaomi, Chromecast with Google TV, and others).
 
 ## What it does
