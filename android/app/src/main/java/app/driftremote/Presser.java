@@ -29,13 +29,14 @@ public class Presser {
             h.postDelayed(this, 110);
         }
     };
-    private final Runnable longPress = () -> {
-        longSent = true;
-        sink.key(key, RemoteSession.START_LONG);
-    };
+    private final Runnable longPress;
 
     public Presser(Sink sink) {
         this.sink = sink;
+        this.longPress = () -> {
+            longSent = true;
+            sink.key(key, RemoteSession.START_LONG);
+        };
     }
 
     public void down(int code, boolean repeating) {
