@@ -28,6 +28,7 @@ public class MainActivity extends Activity implements Discovery.Listener {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         setContentView(R.layout.activity_main);
+        Ui.fitSystemBars(findViewById(R.id.root));
         list = findViewById(R.id.list);
         status = findViewById(R.id.status);
         discovery = new Discovery(this, this);

@@ -46,6 +46,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         setContentView(R.layout.activity_remote);
+        Ui.fitSystemBars(findViewById(R.id.root));
         host = getIntent().getStringExtra("host");
         name = getIntent().getStringExtra("name");
         ((TextView) findViewById(R.id.tvName)).setText(name);
