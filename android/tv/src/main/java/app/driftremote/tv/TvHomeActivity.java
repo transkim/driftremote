@@ -25,10 +25,9 @@ public class TvHomeActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(0xFF0E1215);
-        int p = (int) (48 * d);
-        root.setPadding(p, p, p, p);
+        root.setPadding((int) (96 * d), (int) (40 * d), (int) (96 * d), (int) (40 * d));
 
-        TextView title = text("Driftremote mouse", 34, 0xFFE9EFF1);
+        TextView title = text("Driftremote mouse", 30, 0xFFE9EFF1);
         title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         root.addView(title);
         status = text("", 20, 0xFF6CD4A8);
@@ -41,18 +40,27 @@ public class TvHomeActivity extends Activity {
                 + "3. On your phone, open the remote and tap the mouse button. Type the code this TV shows.",
                 18, 0xFFB8C3C8);
         steps.setGravity(Gravity.START);
-        steps.setMaxWidth((int) (720 * d));
-        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-2, -2);
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
         sl.topMargin = (int) (28 * d);
         root.addView(steps, sl);
 
         toggle = new Button(this);
         toggle.setAllCaps(false);
         toggle.setTextSize(20);
+        toggle.setFocusable(true);
+        toggle.setTextColor(0xFFE9EFF1);
+        toggle.setPadding((int) (32 * d), (int) (12 * d), (int) (32 * d), (int) (12 * d));
+        toggle.setBackground(buttonBackground(d));
         toggle.setOnClickListener(v -> openAccessibility());
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
         bl.topMargin = (int) (32 * d);
         root.addView(toggle, bl);
+
+        TextView manual = text("Or by hand: Settings > System (or Device Preferences) > Accessibility > Driftremote mouse",
+                15, 0xFF8D999F);
+        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-2, -2);
+        ml.topMargin = (int) (14 * d);
+        root.addView(manual, ml);
 
         TextView footer = text("Developed by " + getString(R.string.developer) + "  ·  Version " + BuildConfig.VERSION_NAME,
                 14, 0xFF8D999F);
@@ -60,7 +68,11 @@ public class TvHomeActivity extends Activity {
         fl.topMargin = (int) (36 * d);
         root.addView(footer, fl);
 
-        setContentView(root);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(0xFF0E1215);
+        scroll.addView(root);
+        setContentView(scroll);
         toggle.requestFocus();
     }
 
@@ -80,12 +92,61 @@ public class TvHomeActivity extends Activity {
         return PointerService.running;
     }
 
+    /**
+     * TV makers move the Accessibility screen around, and some (e.g. Hisense) don't
+     * answer the standard shortcut. Try the known screens, then explain the way by hand.
+     */
     private void openAccessibility() {
-        try {
-            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-        } catch (RuntimeException e) {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
+        Intent[] tries = {
+                new Intent().setClassName("com.android.tv.settings",
+                        "com.android.tv.settings.accessibility.AccessibilityActivity"),
+                new Intent().setClassName("com.android.tv.settings",
+                        "com.android.tv.settings.accessibility.AccessibilitySettingsActivity"),
+                new Intent().setClassName("com.android.settings",
+                        "com.android.settings.Settings$AccessibilitySettingsActivity"),
+                new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+        };
+        for (Intent i : tries) {
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            android.content.pm.ResolveInfo ri = getPackageManager().resolveActivity(i, 0);
+            if (ri == null || ri.activityInfo == null || !ri.activityInfo.exported) continue;
+            try {
+                startActivity(i);
+                return;
+            } catch (RuntimeException ignored) {
+                // try the next one
+            }
         }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Turn on the mouse by hand")
+                .setMessage("This TV doesn't open Accessibility directly. Press the Settings (gear) button on the TV remote and go to:\n\n"
+                        + "Settings > System (or Device Preferences) > Accessibility > Driftremote mouse > On\n\n"
+                        + "If the switch is greyed out or says \"Restricted setting\", it can be turned on from a computer instead "
+                        + "(ask in the Driftremote chat).")
+                .setPositiveButton("Open Settings", (d, w) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (RuntimeException ignored) {
+                    }
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    /** Grey normally, bright green with a white ring when the TV remote's focus is on it. */
+    private static android.graphics.drawable.Drawable buttonBackground(float d) {
+        android.graphics.drawable.GradientDrawable normal = new android.graphics.drawable.GradientDrawable();
+        normal.setColor(0xFF2E383F);
+        normal.setCornerRadius(12 * d);
+        android.graphics.drawable.GradientDrawable focused = new android.graphics.drawable.GradientDrawable();
+        focused.setColor(0xFF1F8A6B);
+        focused.setCornerRadius(12 * d);
+        focused.setStroke((int) (3 * d), 0xFFFFFFFF);
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, focused);
+        s.addState(new int[]{android.R.attr.state_pressed}, focused);
+        s.addState(new int[]{}, normal);
+        return s;
     }
 
     private TextView text(String s, float size, int color) {
