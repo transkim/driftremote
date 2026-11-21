@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  protocol-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install cryptography
+      # Pairing + remote protocol against a simulated TV, and the pairing hash
+      # cross-checked with the Python reference algorithm (androidtvremote2).
+      - run: |
+          javac -d build android/app/src/main/java/app/driftremote/core/*.java android/coretest/app/driftremote/core/*.java
+          timeout 60 java -cp build app.driftremote.core.FakeTvTest
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      # the ubuntu runner already ships the Android SDK (ANDROID_HOME)
+      - run: chmod +x gradlew && ./gradlew lintRelease assembleRelease --no-daemon
+      - run: cp app/build/outputs/apk/release/app-release.apk ../Driftremote.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Driftremote-Android-apk
+          path: Driftremote.apk
+          retention-days: 3

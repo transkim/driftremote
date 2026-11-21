@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="18dp"
+    android:paddingTop="12dp"
+    android:paddingRight="18dp"
+    android:paddingBottom="14dp">
+
+    <!-- header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/close"
+            style="@style/RoundButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Your TVs"
+            android:src="@drawable/ic_tv" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/power"
+            style="@style/RoundButton"
+            android:background="@drawable/bg_power"
+            android:contentDescription="Power"
+            android:src="@drawable/ic_power"
+            android:tint="@color/danger" />
+    </LinearLayout>
+
+    <!-- top tools -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal">
+
+        <ImageButton android:id="@+id/input" style="@style/RoundButton" android:contentDescription="Input source" android:src="@drawable/ic_input" />
+        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <ImageButton android:id="@+id/keyboard" style="@style/RoundButton" android:contentDescription="Keyboard" android:src="@drawable/ic_keyboard" />
+        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <ImageButton android:id="@+id/settings" style="@style/RoundButton" android:contentDescription="TV settings" android:src="@drawable/ic_tune" />
+        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <ImageButton android:id="@+id/more" style="@style/RoundButton" android:contentDescription="More buttons" android:src="@drawable/ic_more" />
+        <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <ImageButton android:id="@+id/mode" style="@style/RoundButton" android:contentDescription="Switch between d-pad and touchpad" android:src="@drawable/ic_touch" />
+    </LinearLayout>
+
+    <!-- d-pad / touchpad -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:layout_weight="1">
+
+        <app.driftremote.DpadView
+            android:id="@+id/dpad"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <app.driftremote.TouchpadView
+            android:id="@+id/touchpad"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <ImageButton android:id="@+id/back" style="@style/PillButton" android:contentDescription="Back" android:src="@drawable/ic_back" />
+        <ImageButton android:id="@+id/home" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Home" android:src="@drawable/ic_home" />
+        <ImageButton android:id="@+id/menu" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Menu" android:src="@drawable/ic_menu" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <ImageButton android:id="@+id/volDown" style="@style/PillButton" android:contentDescription="Volume down" android:src="@drawable/ic_minus" />
+        <ImageButton android:id="@+id/mute" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Mute" android:src="@drawable/ic_mute" />
+        <ImageButton android:id="@+id/volUp" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Volume up" android:src="@drawable/ic_plus" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <ImageButton android:id="@+id/rewind" style="@style/PillButton" android:contentDescription="Rewind" android:src="@drawable/ic_rewind" />
+        <ImageButton android:id="@+id/playPause" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Play or pause" android:src="@drawable/ic_play_pause" />
+        <ImageButton android:id="@+id/ff" style="@style/PillButton" android:layout_marginLeft="10dp" android:contentDescription="Fast forward" android:src="@drawable/ic_ff" />
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/apps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+</LinearLayout>
