@@ -4,6 +4,8 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Granted once from a computer (adb) on TVs that hide the Accessibility screen -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
     <!-- so the app can check which Settings screens this TV has (Android 11+) -->
     <queries>

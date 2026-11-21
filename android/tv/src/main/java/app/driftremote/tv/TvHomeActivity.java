@@ -25,7 +25,9 @@ public class TvHomeActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(0xFF0E1215);
-        root.setPadding((int) (96 * d), (int) (40 * d), (int) (96 * d), (int) (40 * d));
+        // TVs often crop the screen edges (overscan): keep text well inside.
+        int side = (int) (getResources().getDisplayMetrics().widthPixels * 0.12f);
+        root.setPadding(side, (int) (40 * d), side, (int) (40 * d));
 
         TextView title = text("Driftremote mouse", 30, 0xFFE9EFF1);
         title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
@@ -38,7 +40,7 @@ public class TvHomeActivity extends Activity {
                 + "1. Select \"Turn on the mouse\" below.\n"
                 + "2. In Accessibility, open \"Driftremote mouse\" and switch it on.\n"
                 + "3. On your phone, open the remote and tap the mouse button. Type the code this TV shows.",
-                18, 0xFFB8C3C8);
+                16, 0xFFB8C3C8);
         steps.setGravity(Gravity.START);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(-1, -2);
         sl.topMargin = (int) (28 * d);
@@ -51,14 +53,22 @@ public class TvHomeActivity extends Activity {
         toggle.setTextColor(0xFFE9EFF1);
         toggle.setPadding((int) (32 * d), (int) (12 * d), (int) (32 * d), (int) (12 * d));
         toggle.setBackground(buttonBackground(d));
-        toggle.setOnClickListener(v -> openAccessibility());
+        toggle.setOnClickListener(v -> {
+            if (canSwitchDirectly()) {
+                switchOnDirectly();
+                status.setText("Turning the mouse on…");
+                status.postDelayed(this::onResume, 1500);
+            } else {
+                openAccessibility();
+            }
+        });
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-2, -2);
         bl.topMargin = (int) (32 * d);
         root.addView(toggle, bl);
 
         TextView manual = text("Or by hand: Settings > System (or Device Preferences) > Accessibility > Driftremote mouse",
-                15, 0xFF8D999F);
-        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-2, -2);
+                14, 0xFF8D999F);
+        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, -2);
         ml.topMargin = (int) (14 * d);
         root.addView(manual, ml);
 
@@ -90,6 +100,28 @@ public class TvHomeActivity extends Activity {
         String me = new ComponentName(this, PointerService.class).flattenToString();
         for (String s : list.split(":")) if (s.equalsIgnoreCase(me)) return true;
         return PointerService.running;
+    }
+
+    /** True once a computer has run: adb shell pm grant app.driftremote.tv android.permission.WRITE_SECURE_SETTINGS */
+    private boolean canSwitchDirectly() {
+        return checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Adds the mouse service to the TV's list of enabled accessibility services. */
+    private void switchOnDirectly() {
+        try {
+            android.content.ContentResolver cr = getContentResolver();
+            String me = new ComponentName(this, PointerService.class).flattenToString();
+            String list = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            boolean has = false;
+            if (!TextUtils.isEmpty(list)) for (String x : list.split(":")) if (x.equalsIgnoreCase(me)) has = true;
+            if (!has) list = TextUtils.isEmpty(list) ? me : list + ":" + me;
+            Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list);
+            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1);
+        } catch (RuntimeException e) {
+            openAccessibility();
+        }
     }
 
     /**
