@@ -25,6 +25,7 @@ jobs:
       - run: |
           javac -d build android/app/src/main/java/app/driftremote/core/*.java android/coretest/app/driftremote/core/*.java
           timeout 60 java -cp build app.driftremote.core.FakeTvTest
+          timeout 60 java -cp build app.driftremote.core.MouseTest
 
   android:
     runs-on: ubuntu-latest

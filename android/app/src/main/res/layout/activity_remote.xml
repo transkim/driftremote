@@ -97,6 +97,43 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/mousePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <app.driftremote.MouseView
+                android:id="@+id/mousePad"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/mouseSetup"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_accent"
+                android:text="Set up the mouse on your TV"
+                android:textAllCaps="false"
+                android:textColor="#FF0E1215"
+                android:textSize="15sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button android:id="@+id/mouseClick" style="@style/ChipButton" android:text="Click" />
+                <Button android:id="@+id/mouseHold" style="@style/ChipButton" android:layout_marginLeft="8dp" android:text="Long press" />
+                <Button android:id="@+id/mouseSpeed" style="@style/ChipButton" android:layout_marginLeft="8dp" android:text="Speed: Normal" />
+            </LinearLayout>
+        </LinearLayout>
     </FrameLayout>
 
     <LinearLayout

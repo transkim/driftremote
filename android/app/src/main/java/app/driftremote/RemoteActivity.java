@@ -84,28 +84,223 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
             @Override public void onHoldStart() { sendKey(Keys.DPAD_CENTER, RemoteSession.START_LONG); }
             @Override public void onHoldEnd() { sendKey(Keys.DPAD_CENTER, RemoteSession.END_LONG); }
         });
-        boolean useTouchpad = getSharedPreferences("driftremote", MODE_PRIVATE).getBoolean("touchpad", false);
-        setTouchpad(useTouchpad);
+        setupMouse();
+        setPadMode(getSharedPreferences("driftremote", MODE_PRIVATE).getInt("padMode",
+                getSharedPreferences("driftremote", MODE_PRIVATE).getBoolean("touchpad", false) ? 1 : 0));
         findViewById(R.id.mode).setOnClickListener(v -> {
-            boolean now = touchpad.getVisibility() != View.VISIBLE;
-            setTouchpad(now);
-            getSharedPreferences("driftremote", MODE_PRIVATE).edit().putBoolean("touchpad", now).apply();
+            CharSequence[] names = {"D-pad", "Swipe pad", "Mouse pointer"};
+            new AlertDialog.Builder(this).setTitle("Control with")
+                    .setSingleChoiceItems(names, padMode, (d, which) -> {
+                        d.dismiss();
+                        setPadMode(which);
+                        getSharedPreferences("driftremote", MODE_PRIVATE).edit().putInt("padMode", which).apply();
+                    }).show();
         });
 
         buildApps();
         conn = new TvConnection(host, this);
     }
 
-    private void setTouchpad(boolean on) {
-        touchpad.setVisibility(on ? View.VISIBLE : View.GONE);
-        dpad.setVisibility(on ? View.GONE : View.VISIBLE);
-        ((ImageButton) findViewById(R.id.mode)).setImageResource(on ? R.drawable.ic_dpad : R.drawable.ic_touch);
+    private int padMode;
+
+    /** 0 = d-pad, 1 = swipe pad, 2 = mouse pointer */
+    private void setPadMode(int m) {
+        padMode = m;
+        dpad.setVisibility(m == 0 ? View.VISIBLE : View.GONE);
+        touchpad.setVisibility(m == 1 ? View.VISIBLE : View.GONE);
+        mousePanel.setVisibility(m == 2 ? View.VISIBLE : View.GONE);
+        ((ImageButton) findViewById(R.id.mode)).setImageResource(
+                m == 0 ? R.drawable.ic_dpad : m == 1 ? R.drawable.ic_touch : R.drawable.ic_mouse);
+        if (m == 2 && started) mouse.start();
+        else mouse.stop();
+    }
+
+    // ---- mouse pointer ----
+
+    private View mousePanel;
+    private MouseView mousePad;
+    private MouseLink mouse;
+    private Button mouseSetup;
+    private boolean started;
+    private AlertDialog pinDialog;
+    private ApkServer apkServer;
+    private static final float[] SPEEDS = {0.6f, 1f, 1.6f};
+    private static final String[] SPEED_NAMES = {"Slow", "Normal", "Fast"};
+
+    private void setupMouse() {
+        mousePanel = findViewById(R.id.mousePanel);
+        mousePad = findViewById(R.id.mousePad);
+        mouseSetup = findViewById(R.id.mouseSetup);
+        mouse = new MouseLink(this, host, this::onMouseState);
+        mousePad.setListener(new MouseView.Listener() {
+            private app.driftremote.core.MouseClient c() { return mouse.client(); }
+            @Override public void move(float dx, float dy) { if (c() != null) c().move(dx, dy); }
+            @Override public void click() { if (c() != null) c().click(); else mouseNotReady(); }
+            @Override public void longPress() { if (c() != null) c().longPress(); }
+            @Override public void dragStart() { if (c() != null) c().dragStart(); }
+            @Override public void dragMove(float dx, float dy) { if (c() != null) c().dragMove(dx, dy); }
+            @Override public void dragEnd() { if (c() != null) c().dragEnd(); }
+            @Override public void scrollStart() { if (c() != null) c().scrollStart(); }
+            @Override public void scrollMove(float dx, float dy) { if (c() != null) c().scrollMove(dx, dy); }
+            @Override public void scrollEnd() { if (c() != null) c().scrollEnd(); }
+            @Override public void back() { sendKey(Keys.BACK, RemoteSession.SHORT); }
+        });
+        findViewById(R.id.mouseClick).setOnClickListener(v -> {
+            if (mouse.client() != null) mouse.client().click(); else mouseNotReady();
+        });
+        findViewById(R.id.mouseHold).setOnClickListener(v -> {
+            if (mouse.client() != null) mouse.client().longPress(); else mouseNotReady();
+        });
+        Button speedBtn = findViewById(R.id.mouseSpeed);
+        int sp = getSharedPreferences("driftremote", MODE_PRIVATE).getInt("mouseSpeed", 1);
+        mousePad.setSpeed(SPEEDS[sp]);
+        speedBtn.setText("Speed: " + SPEED_NAMES[sp]);
+        speedBtn.setOnClickListener(v -> {
+            int n = (getSharedPreferences("driftremote", MODE_PRIVATE).getInt("mouseSpeed", 1) + 1) % 3;
+            getSharedPreferences("driftremote", MODE_PRIVATE).edit().putInt("mouseSpeed", n).apply();
+            mousePad.setSpeed(SPEEDS[n]);
+            speedBtn.setText("Speed: " + SPEED_NAMES[n]);
+        });
+        mouseSetup.setOnClickListener(v -> showMouseSetup());
+    }
+
+    private void mouseNotReady() {
+        long now = System.currentTimeMillis();
+        if (now - lastNotConnectedToast > 2500) {
+            lastNotConnectedToast = now;
+            Toast.makeText(this, "The mouse isn't connected yet", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void onMouseState(MouseLink.State s) {
+        mouseSetup.setVisibility(s == MouseLink.State.NOT_SET_UP ? View.VISIBLE : View.GONE);
+        switch (s) {
+            case CONNECTING:
+                if (mouse.client() == null) mousePad.setMessage("Connecting the mouse…");
+                break;
+            case READY:
+                mousePad.setMessage(null);
+                if (pinDialog != null) {
+                    pinDialog.dismiss();
+                    pinDialog = null;
+                }
+                break;
+            case NEED_PIN:
+            case WRONG_PIN:
+                mousePad.setMessage("Type the code shown on the TV");
+                askMousePin(s == MouseLink.State.WRONG_PIN);
+                break;
+            case NOT_SET_UP:
+                mousePad.setMessage("The mouse needs a one-time setup on the TV.\nTap the button below.");
+                if (pinDialog != null) {
+                    pinDialog.dismiss();
+                    pinDialog = null;
+                }
+                break;
+            case OFFLINE:
+                mousePad.setMessage("Can't reach the TV mouse. Retrying…");
+                break;
+        }
+    }
+
+    private void askMousePin(boolean wrong) {
+        if (pinDialog != null) pinDialog.dismiss();
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(4)});
+        input.setTextSize(26);
+        input.setGravity(Gravity.CENTER);
+        input.setLetterSpacing(0.3f);
+        pinDialog = new AlertDialog.Builder(this)
+                .setTitle("Connect the mouse")
+                .setMessage((wrong ? "That code didn't match. " : "") + "Type the 4-digit code shown on the TV.")
+                .setView(pad(input))
+                .setPositiveButton("Connect", (d, w) -> mouse.sendPin(input.getText().toString()))
+                .setNegativeButton("Cancel", (d, w) -> setPadMode(0))
+                .setCancelable(false)
+                .create();
+        pinDialog.setOnShowListener(d -> {
+            input.requestFocus();
+            pinDialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        });
+        pinDialog.show();
+    }
+
+    private void showMouseSetup() {
+        if (apkServer == null) apkServer = new ApkServer(this);
+        apkServer.start();
+        String url = ApkServer.url();
+        float d = getResources().getDisplayMetrics().density;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+
+        TextView t1 = new TextView(this);
+        t1.setTextColor(Ui.color(this, R.color.text));
+        t1.setTextSize(15);
+        t1.setText("The mouse pointer needs Driftremote on the TV too (the same app). This is a one-time setup.\n\n"
+                + "1. Install the free \"Downloader\" app on the TV.");
+        box.addView(t1);
+        box.addView(smallButton("Open Downloader in the TV's Play Store", v ->
+                sendLink("market://details?id=com.esaba.downloader")));
+
+        TextView t2 = new TextView(this);
+        t2.setTextColor(Ui.color(this, R.color.text));
+        t2.setTextSize(15);
+        t2.setText("\n2. Open Downloader on the TV, select its address box, and type this address "
+                + "(or tap \"Type it on the TV\"). Then choose Go, and Install. "
+                + "Allow Downloader to install apps if the TV asks.\n");
+        box.addView(t2);
+        TextView link = new TextView(this);
+        link.setTextColor(Ui.color(this, R.color.accent));
+        link.setTextSize(18);
+        link.setTextIsSelectable(true);
+        link.setText(url == null ? "Connect this phone to Wi-Fi first" : url);
+        box.addView(link);
+        if (url != null) box.addView(smallButton("Type it on the TV", v -> typeText(url)));
+
+        TextView t3 = new TextView(this);
+        t3.setTextColor(Ui.color(this, R.color.text));
+        t3.setTextSize(15);
+        t3.setText("\n3. Open Driftremote on the TV and choose \"Turn on the mouse\". "
+                + "In Accessibility, open \"Driftremote mouse\" and switch it on.");
+        box.addView(t3);
+        box.addView(smallButton("Open Driftremote on the TV", v -> sendLink("market://launch?id=app.driftremote")));
+
+        TextView t4 = new TextView(this);
+        t4.setTextColor(Ui.color(this, R.color.muted));
+        t4.setTextSize(14);
+        t4.setText("\n4. Come back here. The mouse connects by itself, and the TV shows a code to type once. "
+                + "Keep this window open until the TV has downloaded the app.");
+        box.addView(t4);
+
+        for (int i = 0; i < box.getChildCount(); i++) {
+            View c = box.getChildAt(i);
+            if (c instanceof Button) {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, (int) (44 * d));
+                lp.topMargin = (int) (8 * d);
+                c.setLayoutParams(lp);
+            }
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(pad(box));
+        new AlertDialog.Builder(this).setTitle("Set up the mouse on your TV").setView(sv)
+                .setPositiveButton("Done", null)
+                .setOnDismissListener(di -> {
+                    if (apkServer != null) apkServer.stop();
+                })
+                .show();
+    }
+
+    private void sendLink(String link) {
+        if (!conn.send(s -> s.openLink(link))) notConnected();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        started = true;
         if (!pairingShown) conn.start();
+        if (padMode == 2) mouse.start();
     }
 
     @Override
@@ -113,6 +308,9 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         super.onStop();
         presser.cancel();
         conn.stop();
+        started = false;
+        mouse.stop();
+        if (apkServer != null) apkServer.stop();
     }
 
     // ---- connection callbacks ----
