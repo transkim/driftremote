@@ -10,8 +10,8 @@ android {
         applicationId 'app.driftremote'
         minSdk 21
         targetSdk 35
-        versionCode 5
-        versionName '0.2.0'
+        versionCode 6
+        versionName '0.2.1'
     }
 
     buildFeatures {
@@ -42,8 +42,32 @@ android {
         checkReleaseBuilds false
     }
 
+    androidResources {
+        noCompress 'apk'
+    }
+
+    // The TV mouse app is built first and shipped inside the phone app, which
+    // serves it on the Wi-Fi so the TV can download it.
+    sourceSets {
+        main {
+            assets.srcDirs += layout.buildDirectory.dir('tvapk').get().asFile
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    implementation project(':core')
+}
+
+def copyTvApk = tasks.register('copyTvApk', Copy) {
+    dependsOn ':tv:assembleRelease'
+    from(project(':tv').layout.buildDirectory.file('outputs/apk/release/tv-release.apk'))
+    into(layout.buildDirectory.dir('tvapk'))
+    rename { 'driftremote-tv.apk' }
+}
+tasks.named('preBuild') { dependsOn copyTvApk }

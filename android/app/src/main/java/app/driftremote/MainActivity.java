@@ -27,13 +27,6 @@ public class MainActivity extends Activity implements Discovery.Listener {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        android.app.UiModeManager ui = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
-        if (ui != null && ui.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
-            // Running on the TV itself: show the mouse setup screen instead.
-            startActivity(new Intent(this, app.driftremote.tv.TvHomeActivity.class));
-            finish();
-            return;
-        }
         setContentView(R.layout.activity_main);
         Ui.fitSystemBars(findViewById(R.id.root));
         list = findViewById(R.id.list);

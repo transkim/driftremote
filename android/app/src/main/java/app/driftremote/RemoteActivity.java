@@ -237,7 +237,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         TextView t1 = new TextView(this);
         t1.setTextColor(Ui.color(this, R.color.text));
         t1.setTextSize(15);
-        t1.setText("The mouse pointer needs Driftremote on the TV too (the same app). This is a one-time setup.\n\n"
+        t1.setText("The mouse pointer needs the small Driftremote TV app on the TV. This is a one-time setup.\n\n"
                 + "1. Install the free \"Downloader\" app on the TV.");
         box.addView(t1);
         box.addView(smallButton("Open Downloader in the TV's Play Store", v ->
@@ -261,10 +261,10 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         TextView t3 = new TextView(this);
         t3.setTextColor(Ui.color(this, R.color.text));
         t3.setTextSize(15);
-        t3.setText("\n3. Open Driftremote on the TV and choose \"Turn on the mouse\". "
+        t3.setText("\n3. Open Driftremote TV on the TV and choose \"Turn on the mouse\". "
                 + "In Accessibility, open \"Driftremote mouse\" and switch it on.");
         box.addView(t3);
-        box.addView(smallButton("Open Driftremote on the TV", v -> sendLink("market://launch?id=app.driftremote")));
+        box.addView(smallButton("Open Driftremote TV on the TV", v -> sendLink("market://launch?id=app.driftremote.tv")));
 
         TextView t4 = new TextView(this);
         t4.setTextColor(Ui.color(this, R.color.muted));

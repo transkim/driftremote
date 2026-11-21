@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.driftremote.tv'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.driftremote.tv'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.2.1'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        // A fixed key kept in the repo so every build installs over the previous one.
+        // It is public, so use your own keystore before publishing to Google Play.
+        sideload {
+            storeFile file('../app/driftremote.jks')
+            storePassword 'driftremote'
+            keyAlias 'driftremote'
+            keyPassword 'driftremote'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.sideload
+        }
+    }
+
+    lint {
+        checkOnly 'NewApi'
+        abortOnError true
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+
+dependencies {
+    implementation project(':core')
+}

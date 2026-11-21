@@ -17,8 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 /**
- * Serves this app's own APK on the Wi-Fi, so the TV can download and install it
- * (the same APK contains the TV mouse service).
+ * Serves the Driftremote TV app (shipped inside this app) on the Wi-Fi, so the TV
+ * can download and install it.
  */
 public class ApkServer {
     public static final int PORT = 8642;
@@ -27,7 +27,14 @@ public class ApkServer {
     private volatile boolean running;
 
     public ApkServer(Context ctx) {
-        apk = new File(ctx.getApplicationInfo().sourceDir);
+        apk = new File(ctx.getCacheDir(), "driftremote-tv.apk");
+        try (InputStream in = ctx.getAssets().open("driftremote-tv.apk");
+             java.io.FileOutputStream out = new java.io.FileOutputStream(apk)) {
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        } catch (IOException ignored) {
+        }
     }
 
     public synchronized void start() {
@@ -75,7 +82,7 @@ public class ApkServer {
             OutputStream out = sock.getOutputStream();
             String head = "HTTP/1.1 200 OK\r\n"
                     + "Content-Type: application/vnd.android.package-archive\r\n"
-                    + "Content-Disposition: attachment; filename=\"driftremote.apk\"\r\n"
+                    + "Content-Disposition: attachment; filename=\"driftremote-tv.apk\"\r\n"
                     + "Content-Length: " + apk.length() + "\r\n"
                     + "Connection: close\r\n\r\n";
             out.write(head.getBytes(StandardCharsets.US_ASCII));
@@ -107,6 +114,6 @@ public class ApkServer {
 
     public static String url() {
         String ip = phoneIp();
-        return ip == null ? null : "http://" + ip + ":" + PORT + "/d.apk";
+        return ip == null ? null : "http://" + ip + ":" + PORT + "/tv.apk";
     }
 }

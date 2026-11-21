@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Driftremote"
-include ':app'
+include ':app', ':tv', ':core'

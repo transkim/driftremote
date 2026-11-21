@@ -11,8 +11,6 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import app.driftremote.BuildConfig;
-import app.driftremote.R;
 
 /** What the user sees when opening Driftremote on the TV: turn the mouse on. */
 public class TvHomeActivity extends Activity {

@@ -23,7 +23,7 @@ jobs:
       # Pairing + remote protocol against a simulated TV, and the pairing hash
       # cross-checked with the Python reference algorithm (androidtvremote2).
       - run: |
-          javac -d build android/app/src/main/java/app/driftremote/core/*.java android/coretest/app/driftremote/core/*.java
+          javac -d build android/core/src/main/java/app/driftremote/core/*.java android/coretest/app/driftremote/core/*.java
           timeout 60 java -cp build app.driftremote.core.FakeTvTest
           timeout 60 java -cp build app.driftremote.core.MouseTest
 
@@ -41,9 +41,16 @@ jobs:
           cache: gradle
       # the ubuntu runner already ships the Android SDK (ANDROID_HOME)
       - run: chmod +x gradlew && for i in 1 2 3; do ./gradlew lintRelease assembleRelease --no-daemon && exit 0; sleep 45; done; exit 1
-      - run: cp app/build/outputs/apk/release/app-release.apk ../Driftremote.apk
+      - run: |
+          cp app/build/outputs/apk/release/app-release.apk ../Driftremote.apk
+          cp tv/build/outputs/apk/release/tv-release.apk ../Driftremote-TV.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Driftremote-Android-apk
           path: Driftremote.apk
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Driftremote-TV-apk
+          path: Driftremote-TV.apk
           retention-days: 3
