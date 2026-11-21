@@ -38,8 +38,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
       # the ubuntu runner already ships the Android SDK (ANDROID_HOME)
-      - run: chmod +x gradlew && ./gradlew lintRelease assembleRelease --no-daemon
+      - run: chmod +x gradlew && for i in 1 2 3; do ./gradlew lintRelease assembleRelease --no-daemon && exit 0; sleep 45; done; exit 1
       - run: cp app/build/outputs/apk/release/app-release.apk ../Driftremote.apk
       - uses: actions/upload-artifact@v4
         with:
