@@ -21,6 +21,11 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            saveReport("crash.txt", "Thread: " + t.getName() + "\n" + stack(e));
+            if (previous != null) previous.uncaughtException(t, e);
+        });
         store = new TvStore(this);
         // Make the key early, so it is ready by the time the user picks a TV.
         new Thread(() -> {
@@ -29,6 +34,43 @@ public class App extends Application {
             } catch (Exception ignored) {
             }
         }, "identity").start();
+    }
+
+    /** Records a problem that was handled, so it can be shared with the crash report. */
+    public static void logProblem(Throwable e) {
+        App a = instance;
+        if (a != null) a.saveReport("problem.txt", stack(e));
+    }
+
+    static String stack(Throwable e) {
+        java.io.StringWriter w = new java.io.StringWriter();
+        e.printStackTrace(new java.io.PrintWriter(w));
+        return w.toString();
+    }
+
+    private void saveReport(String file, String body) {
+        try (OutputStream out = new FileOutputStream(new File(getFilesDir(), file))) {
+            String head = "Driftremote " + BuildConfig.VERSION_NAME + " · Android " + Build.VERSION.RELEASE
+                    + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n" + new java.util.Date() + "\n\n";
+            out.write((head + body).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Returns and removes the saved crash report, or null when there is none. */
+    public String takeCrashReport() {
+        File f = new File(getFilesDir(), "crash.txt");
+        if (!f.exists()) return null;
+        try {
+            String text = new String(readAll(f), java.nio.charset.StandardCharsets.UTF_8);
+            File p = new File(getFilesDir(), "problem.txt");
+            if (p.exists()) text += "\n\nEarlier problem:\n" + new String(readAll(p), java.nio.charset.StandardCharsets.UTF_8);
+            return text;
+        } catch (IOException e) {
+            return null;
+        } finally {
+            f.delete();
+        }
     }
 
     public static App get() {

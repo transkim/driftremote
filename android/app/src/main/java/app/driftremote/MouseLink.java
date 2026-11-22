@@ -85,7 +85,9 @@ public class MouseLink {
             } catch (MouseClient.NotInstalledException e) {
                 post(gen, State.NOT_SET_UP);
                 delay = 3000;
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
+                if (e instanceof RuntimeException) App.logProblem(e);
+                c.close();
                 post(gen, State.OFFLINE);
                 if (System.currentTimeMillis() - started > 10000) delay = 1000;
             }

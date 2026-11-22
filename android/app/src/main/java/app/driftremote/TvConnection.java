@@ -120,6 +120,13 @@ public class TvConnection {
                 if (!live(gen)) return;
                 connected = false;
                 post(State.DISCONNECTED, friendly(e));
+            } catch (RuntimeException e) {
+                // A message we didn't expect must not close the app: reconnect instead.
+                App.logProblem(e);
+                s.close();
+                if (!live(gen)) return;
+                connected = false;
+                post(State.DISCONNECTED, "Connection lost.");
             }
             if (System.currentTimeMillis() - startedAt > 15000) delay = 500;
             try {
@@ -160,6 +167,8 @@ public class TvConnection {
                 cmd.run(s);
             } catch (IOException ignored) {
                 // The read loop notices a broken connection and reconnects.
+            } catch (RuntimeException e) {
+                App.logProblem(e);
             }
         });
         return true;

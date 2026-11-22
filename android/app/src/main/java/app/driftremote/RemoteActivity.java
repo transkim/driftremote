@@ -45,8 +45,10 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        typeAsKeys = getSharedPreferences("driftremote", MODE_PRIVATE).getBoolean("typeAsKeys", false);
         setContentView(R.layout.activity_remote);
         Ui.fitSystemBars(findViewById(R.id.root));
+        Ui.showCrashReport(this);
         host = getIntent().getStringExtra("host");
         name = getIntent().getStringExtra("name");
         ((TextView) findViewById(R.id.tvName)).setText(name);
@@ -350,7 +352,9 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     @Override
     public void onTextField(boolean active, String text) {
         tvFieldText = active && text != null ? text : "";
-        if (active && keyboardDialog == null && hasWindowFocus()) {
+        boolean opened = active && !tvFieldActive;
+        tvFieldActive = active;
+        if (opened && started && keyboardDialog == null && hasWindowFocus() && !isFinishing()) {
             showKeyboard(); // the TV asked for text, like Google's remote does
         } else {
             updateKeyboardNote(false);
@@ -507,7 +511,8 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     // ---- keyboard ----
 
     private AlertDialog keyboardDialog;
-    private EditText keyboardInput;
+    private boolean typeAsKeys;
+    private boolean tvFieldActive;
     private TextView keyboardNote;
     private boolean keyboardSyncing;
     private String tvFieldText = "";
@@ -533,15 +538,25 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         note.setTextSize(14);
         note.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
 
+        android.widget.CheckBox keyMode = new android.widget.CheckBox(this);
+        keyMode.setText("Send as letter keys (try this if text doesn't appear)");
+        keyMode.setTextColor(0xCCFFFFFF);
+        keyMode.setChecked(typeAsKeys);
+        keyMode.setOnCheckedChangeListener((v, on) -> {
+            typeAsKeys = on;
+            getSharedPreferences("driftremote", MODE_PRIVATE).edit().putBoolean("typeAsKeys", on).apply();
+            updateKeyboardNote(false);
+        });
+
         LinearLayout keys = new LinearLayout(this);
         keys.setOrientation(LinearLayout.HORIZONTAL);
         keys.addView(smallButton("⌫ Delete", v -> {
-            if (liveTyping()) {
-                String t = input.getText().toString();
-                if (!t.isEmpty()) input.setText(t.substring(0, t.length() - 1));
-                input.setSelection(input.getText().length());
-            } else {
+            String t = input.getText().toString();
+            if (t.isEmpty()) {
                 sendKey(Keys.DEL, RemoteSession.SHORT);
+            } else {
+                input.setText(t.substring(0, t.length() - 1));
+                input.setSelection(input.getText().length());
             }
         }), new LinearLayout.LayoutParams(0, -2, 1));
         keys.addView(smallButton("Search ↵", v -> sendKey(Keys.ENTER, RemoteSession.SHORT)), new LinearLayout.LayoutParams(0, -2, 1));
@@ -550,6 +565,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         box.setOrientation(LinearLayout.VERTICAL);
         box.addView(input, new LinearLayout.LayoutParams(-1, -2));
         box.addView(note, new LinearLayout.LayoutParams(-1, -2));
+        box.addView(keyMode, new LinearLayout.LayoutParams(-1, -2));
         box.addView(keys, new LinearLayout.LayoutParams(-1, -2));
 
         AlertDialog dlg = new AlertDialog.Builder(this)
@@ -559,26 +575,26 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
                 .setNegativeButton("Close", null)
                 .create();
         keyboardDialog = dlg;
-        keyboardInput = input;
         keyboardNote = note;
         updateKeyboardNote(false);
 
-        sentText = liveTyping() ? tvFieldText : "";
-        if (liveTyping() && !tvFieldText.isEmpty()) {
+        sentText = "";
+        if (liveTyping() && !typeAsKeys && tvFieldText != null && !tvFieldText.isEmpty()) {
+            sentText = tvFieldText;
             keyboardSyncing = true;
             input.setText(tvFieldText);
-            input.setSelection(tvFieldText.length());
+            input.setSelection(input.getText().length());
             keyboardSyncing = false;
         }
-        // While the TV has a text field open, every change is mirrored to it right away.
+        // Every change is mirrored to the TV right away. The TV adds what it receives at
+        // the cursor, so only the change is sent: Delete presses for removed letters,
+        // then the new letters.
         input.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence c, int a, int b, int d) {}
             @Override public void onTextChanged(CharSequence c, int a, int b, int d) {}
             @Override
             public void afterTextChanged(android.text.Editable e) {
-                if (keyboardSyncing || !liveTyping()) return;
-                // This TV adds what it receives at the cursor, so send only the change:
-                // Delete presses for removed letters, then the new letters.
+                if (keyboardSyncing) return;
                 String t = e.toString();
                 String before = sentText;
                 int p = 0;
@@ -586,44 +602,45 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
                 int dels = before.length() - p;
                 String add = t.substring(p);
                 sentText = t;
+                boolean ime = liveTyping() && !typeAsKeys;
                 conn.send(s -> {
                     for (int i = 0; i < dels; i++) s.key(Keys.DEL, RemoteSession.SHORT);
-                    if (!add.isEmpty()) s.text(add);
+                    if (add.isEmpty()) return;
+                    if (ime) s.text(add);
+                    else typeKeys(s, add);
                 });
                 updateKeyboardNote(true);
             }
         });
         Runnable send = () -> {
+            // The text is already on the TV; Send submits it.
+            sendKey(Keys.ENTER, RemoteSession.SHORT);
             String text = input.getText().toString();
-            if (liveTyping()) {
-                // Text is already on the TV; Send submits it.
-                sendKey(Keys.ENTER, RemoteSession.SHORT);
-                note.setText("Sent “" + text + "” to the TV.");
-                return;
-            }
-            if (text.isEmpty()) return;
-            typeText(text);
-            note.setText("Sent “" + text + "” as key presses.");
+            if (!text.isEmpty()) note.setText("Sent “" + text + "”.");
             keyboardSyncing = true;
             input.setText("");
             keyboardSyncing = false;
+            sentText = "";
         };
         input.setOnEditorActionListener((v, id, ev) -> {
+            if (ev != null && ev.getAction() != android.view.KeyEvent.ACTION_DOWN) return true;
             send.run();
             return true;
         });
         dlg.setOnShowListener(d -> {
             dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> send.run());
             input.requestFocus();
-            dlg.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            if (dlg.getWindow() != null) {
+                dlg.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            }
         });
         dlg.setOnDismissListener(d -> {
             if (keyboardDialog == dlg) {
                 keyboardDialog = null;
-                keyboardInput = null;
                 keyboardNote = null;
             }
         });
+        if (isFinishing()) return;
         dlg.show();
     }
 
@@ -633,37 +650,42 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
 
     private void updateKeyboardNote(boolean typed) {
         if (keyboardNote == null) return;
-        if (liveTyping()) {
-            keyboardNote.setText(typed ? "Typing on the TV…" : "The TV's text box is ready. What you type appears there as you go.");
+        if (typed) {
+            keyboardNote.setText("Typing on the TV…");
+        } else if (liveTyping() || typeAsKeys) {
+            keyboardNote.setText("What you type appears on the TV as you go. Send runs the search.");
         } else {
-            keyboardNote.setText("Select a search box on the TV first. Until then, Send types it as key presses.");
+            keyboardNote.setText("Select a search box on the TV first. What you type appears there as you go.");
         }
     }
 
     /** Sends text through the TV's input method when a field is active, else as key presses. */
     private void typeText(String text) {
-        if (conn.supportsText() && conn.hasTextField()) {
-            conn.send(s -> s.text(text));
-            return;
-        }
+        boolean ime = liveTyping() && !typeAsKeys;
         conn.send(s -> {
-            for (char c : text.toCharArray()) {
-                int k = Keys.forChar(c);
-                if (k == 0) continue;
-                if (Character.isUpperCase(c)) {
-                    s.key(59, RemoteSession.START_LONG); // shift
-                    s.key(k, RemoteSession.SHORT);
-                    s.key(59, RemoteSession.END_LONG);
-                } else {
-                    s.key(k, RemoteSession.SHORT);
-                }
-                try {
-                    Thread.sleep(40);
-                } catch (InterruptedException e) {
-                    return;
-                }
-            }
+            if (ime) s.text(text);
+            else typeKeys(s, text);
         });
+    }
+
+    /** Types text as key presses; runs on the sending thread. */
+    private static void typeKeys(RemoteSession s, String text) throws java.io.IOException {
+        for (char c : text.toCharArray()) {
+            int k = Keys.forChar(c);
+            if (k == 0) continue;
+            if (Character.isUpperCase(c)) {
+                s.key(59, RemoteSession.START_LONG); // shift
+                s.key(k, RemoteSession.SHORT);
+                s.key(59, RemoteSession.END_LONG);
+            } else {
+                s.key(k, RemoteSession.SHORT);
+            }
+            try {
+                Thread.sleep(40);
+            } catch (InterruptedException e) {
+                return;
+            }
+        }
     }
 
     // ---- more buttons ----

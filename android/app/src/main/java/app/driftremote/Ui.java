@@ -26,6 +26,33 @@ final class Ui {
     }
 
     /** The About screen: app, version, developer and what the app does. */
+    /** If the app closed unexpectedly last time, offers the report so it can be sent to the developer. */
+    static void showCrashReport(android.app.Activity a) {
+        String report = App.get().takeCrashReport();
+        if (report == null) return;
+        android.widget.TextView t = new android.widget.TextView(a);
+        t.setText(report);
+        t.setTextSize(11);
+        t.setTextColor(0xCCFFFFFF);
+        t.setTextIsSelectable(true);
+        int p = dp(a, 20);
+        t.setPadding(p, p / 2, p, p / 2);
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.addView(t);
+        new android.app.AlertDialog.Builder(a)
+                .setTitle("Driftremote closed last time")
+                .setMessage("Copy this report and send it to the developer so it can be fixed.")
+                .setView(sv)
+                .setPositiveButton("Copy report", (d, w) -> {
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("Driftremote report", report));
+                    android.widget.Toast.makeText(a, "Report copied", android.widget.Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
     static void showAbout(android.app.Activity a) {
         android.widget.LinearLayout box = new android.widget.LinearLayout(a);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
