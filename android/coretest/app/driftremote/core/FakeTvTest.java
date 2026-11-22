@@ -74,12 +74,14 @@ public class FakeTvTest {
         check(ready.await(5, TimeUnit.SECONDS), "remote started");
         check(power[0], "TV reports power on");
         s.key(19, RemoteSession.SHORT);
+        Thread.sleep(500);
         s.text("hello");
         s.openLink("https://www.youtube.com");
         Thread.sleep(1500);
         check(vol[0] == 12, "volume reported");
         check(got.contains("key 19 3"), "d-pad up received");
         check(got.contains("text hello"), "text received");
+        check(got.contains("ime 5") && got.contains("field 141"), "text uses the focused field's counters, not the batch-edit echo");
         check(got.contains("link https://www.youtube.com"), "app link received");
         check(got.contains("pong 77"), "ping answered");
         check(got.contains("features " + (2|4|32|64|512)), "features negotiated");
@@ -167,10 +169,16 @@ public class FakeTvTest {
                             case 2:
                                 Pb.writeFrame(out, new Pb.W().msg(40, new Pb.W().bool(1, true)).toBytes());
                                 Pb.writeFrame(out, new Pb.W().msg(50, new Pb.W().varint(6, 100).varint(7, 12)).toBytes());
-                                Pb.writeFrame(out, new Pb.W().msg(8, new Pb.W().varint(1, 77).varint(2, 1)).toBytes()); break;
+                                Pb.writeFrame(out, new Pb.W().msg(8, new Pb.W().varint(1, 77).varint(2, 1)).toBytes());
+                                // a focused text field (counter 5 / field 141), then a batch-edit echo with other counters
+                                Pb.writeFrame(out, new Pb.W().msg(20, new Pb.W()
+                                        .msg(1, new Pb.W().varint(1, 5).str(12, "com.android.vending"))
+                                        .msg(2, new Pb.W().varint(1, 141).str(2, ""))).toBytes());
+                                Pb.writeFrame(out, new Pb.W().msg(21, new Pb.W().varint(1, 1).varint(2, 2)).toBytes());
+                                break;
                             case 9: while (q.next()) got.add("pong " + q.int32()); break;
                             case 10: { int k = 0, d = 0; while (q.next()) { if (q.field == 1) k = q.int32(); if (q.field == 2) d = q.int32(); } got.add("key " + k + " " + d); break; }
-                            case 21: while (q.next()) if (q.field == 3) { Pb.R e = q.sub(); while (e.next()) if (e.field == 2) { Pb.R o = e.sub(); while (o.next()) if (o.field == 3) got.add("text " + o.str()); } } break;
+                            case 21: while (q.next()) { if (q.field == 1) got.add("ime " + q.int32()); if (q.field == 2) got.add("field " + q.int32()); } q = r.sub(); while (q.next()) if (q.field == 3) { Pb.R e = q.sub(); while (e.next()) if (e.field == 2) { Pb.R o = e.sub(); while (o.next()) if (o.field == 3) got.add("text " + o.str()); } } break;
                             case 90: q.next(); got.add("link " + q.str()); break;
                         }
                     }

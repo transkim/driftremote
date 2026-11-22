@@ -348,7 +348,14 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     }
 
     @Override
-    public void onTextField(boolean active, String text) {}
+    public void onTextField(boolean active, String text) {
+        tvFieldText = active && text != null ? text : "";
+        if (active && keyboardDialog == null && hasWindowFocus()) {
+            showKeyboard(); // the TV asked for text, like Google's remote does
+        } else {
+            updateKeyboardNote(false);
+        }
+    }
 
     private void updateStatus() {
         if (!conn.isConnected()) return;
@@ -499,39 +506,94 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
 
     // ---- keyboard ----
 
+    private AlertDialog keyboardDialog;
+    private EditText keyboardInput;
+    private TextView keyboardNote;
+    private boolean keyboardSyncing;
+    private String tvFieldText = "";
+
     private void showKeyboard() {
         if (!conn.isConnected()) {
             notConnected();
             return;
         }
+        if (keyboardDialog != null && keyboardDialog.isShowing()) return;
         EditText input = new EditText(this);
-        input.setHint("Type here, then Send");
+        input.setHint("Type here");
+        input.setTextColor(0xFFFFFFFF);
+        input.setHintTextColor(0x99FFFFFF);
+        input.setTextSize(20);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         input.setImeOptions(EditorInfo.IME_ACTION_SEND);
         input.setSingleLine(true);
 
+        TextView note = new TextView(this);
+        note.setTextColor(0xCCFFFFFF);
+        note.setTextSize(14);
+        note.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 6));
+
         LinearLayout keys = new LinearLayout(this);
         keys.setOrientation(LinearLayout.HORIZONTAL);
-        keys.addView(smallButton("⌫ Delete", v -> sendKey(Keys.DEL, RemoteSession.SHORT)), new LinearLayout.LayoutParams(0, -2, 1));
+        keys.addView(smallButton("⌫ Delete", v -> {
+            if (liveTyping()) {
+                String t = input.getText().toString();
+                if (!t.isEmpty()) input.setText(t.substring(0, t.length() - 1));
+                input.setSelection(input.getText().length());
+            } else {
+                sendKey(Keys.DEL, RemoteSession.SHORT);
+            }
+        }), new LinearLayout.LayoutParams(0, -2, 1));
         keys.addView(smallButton("Search ↵", v -> sendKey(Keys.ENTER, RemoteSession.SHORT)), new LinearLayout.LayoutParams(0, -2, 1));
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.addView(input, new LinearLayout.LayoutParams(-1, -2));
+        box.addView(note, new LinearLayout.LayoutParams(-1, -2));
         box.addView(keys, new LinearLayout.LayoutParams(-1, -2));
 
         AlertDialog dlg = new AlertDialog.Builder(this)
                 .setTitle("Type on the TV")
-                .setMessage("Select a search box or text field on the TV first.")
                 .setView(pad(box))
                 .setPositiveButton("Send", null)
                 .setNegativeButton("Close", null)
                 .create();
+        keyboardDialog = dlg;
+        keyboardInput = input;
+        keyboardNote = note;
+        updateKeyboardNote(false);
+
+        if (liveTyping() && !tvFieldText.isEmpty()) {
+            keyboardSyncing = true;
+            input.setText(tvFieldText);
+            input.setSelection(tvFieldText.length());
+            keyboardSyncing = false;
+        }
+        // While the TV has a text field open, every change is mirrored to it right away.
+        input.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence c, int a, int b, int d) {}
+            @Override public void onTextChanged(CharSequence c, int a, int b, int d) {}
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                if (keyboardSyncing || !liveTyping()) return;
+                String t = e.toString();
+                conn.send(s -> s.text(t));
+                updateKeyboardNote(true);
+            }
+        });
         Runnable send = () -> {
             String text = input.getText().toString();
+            if (liveTyping()) {
+                // Text is already on the TV; Send submits it.
+                sendKey(Keys.ENTER, RemoteSession.SHORT);
+                note.setText("Sent “" + text + "” to the TV.");
+                return;
+            }
             if (text.isEmpty()) return;
             typeText(text);
+            note.setText("Sent “" + text + "” as key presses.");
+            keyboardSyncing = true;
             input.setText("");
+            keyboardSyncing = false;
         };
         input.setOnEditorActionListener((v, id, ev) -> {
             send.run();
@@ -542,7 +604,27 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
             input.requestFocus();
             dlg.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         });
+        dlg.setOnDismissListener(d -> {
+            if (keyboardDialog == dlg) {
+                keyboardDialog = null;
+                keyboardInput = null;
+                keyboardNote = null;
+            }
+        });
         dlg.show();
+    }
+
+    private boolean liveTyping() {
+        return conn.supportsText() && conn.hasTextField();
+    }
+
+    private void updateKeyboardNote(boolean typed) {
+        if (keyboardNote == null) return;
+        if (liveTyping()) {
+            keyboardNote.setText(typed ? "Typing on the TV…" : "The TV's text box is ready. What you type appears there as you go.");
+        } else {
+            keyboardNote.setText("Select a search box on the TV first. Until then, Send types it as key presses.");
+        }
     }
 
     /** Sends text through the TV's input method when a field is active, else as key presses. */

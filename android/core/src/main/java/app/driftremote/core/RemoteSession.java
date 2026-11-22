@@ -51,6 +51,8 @@ public final class RemoteSession {
     private int features = F_PING | F_KEY | F_IME | F_POWER | F_VOLUME | F_APP_LINK;
     private int imeCounter;
     private int fieldCounter;
+    // Counters from the focused field win over later batch-edit echoes (see androidtvremote2 #51).
+    private boolean hasImeCounter, hasFieldCounter;
     private boolean started;
 
     public RemoteSession(String host, int port, Identity identity, Listener listener) {
@@ -173,23 +175,29 @@ public final class RemoteSession {
 
     private void onImeKeyInject(Pb.R r) throws IOException {
         String pkg = null;
+        int ime = 0, field = 0;
+        String text = null;
         while (r.next()) {
             if (r.wireType != 2) continue;
             Pb.R s = r.sub();
             if (r.field == 1) {
                 while (s.next()) {
-                    if (s.field == 1 && s.wireType == 0) imeCounter = s.int32();
+                    if (s.field == 1 && s.wireType == 0) ime = s.int32();
                     if (s.field == 12 && s.wireType == 2) pkg = s.str();
                 }
             } else if (r.field == 2) {
-                String text = "";
+                text = "";
                 while (s.next()) {
-                    if (s.field == 1 && s.wireType == 0) fieldCounter = s.int32();
+                    if (s.field == 1 && s.wireType == 0) field = s.int32();
                     if (s.field == 2 && s.wireType == 2) text = s.str();
                 }
-                listener.onImeField(true, text);
             }
         }
+        imeCounter = ime;
+        fieldCounter = field;
+        hasImeCounter = ime != 0;
+        hasFieldCounter = field != 0;
+        if (text != null) listener.onImeField(true, text);
         if (pkg != null) listener.onCurrentApp(pkg);
     }
 
@@ -200,6 +208,7 @@ public final class RemoteSession {
                 hasField = true;
                 Pb.R s = r.sub();
                 while (s.next()) if (s.field == 1 && s.wireType == 0) fieldCounter = s.int32();
+                hasFieldCounter = true;
             }
         }
         listener.onImeField(hasField, "");
@@ -208,8 +217,8 @@ public final class RemoteSession {
     private void onImeBatchEdit(Pb.R r) throws IOException {
         while (r.next()) {
             if (r.wireType != 0) continue;
-            if (r.field == 1) imeCounter = r.int32();
-            if (r.field == 2) fieldCounter = r.int32();
+            if (r.field == 1 && !hasImeCounter) imeCounter = r.int32();
+            if (r.field == 2 && !hasFieldCounter) fieldCounter = r.int32();
         }
     }
 
@@ -229,6 +238,10 @@ public final class RemoteSession {
     /** Opens an app link such as https://www.youtube.com or market://launch?id=package. */
     public void openLink(String link) throws IOException {
         send(new Pb.W().msg(90, new Pb.W().str(1, link)));
+    }
+
+    int[] imeCounters() {
+        return new int[]{imeCounter, fieldCounter};
     }
 
     public boolean supports(int feature) {
