@@ -511,6 +511,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
     private TextView keyboardNote;
     private boolean keyboardSyncing;
     private String tvFieldText = "";
+    private String sentText = "";
 
     private void showKeyboard() {
         if (!conn.isConnected()) {
@@ -562,6 +563,7 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
         keyboardNote = note;
         updateKeyboardNote(false);
 
+        sentText = liveTyping() ? tvFieldText : "";
         if (liveTyping() && !tvFieldText.isEmpty()) {
             keyboardSyncing = true;
             input.setText(tvFieldText);
@@ -575,8 +577,19 @@ public class RemoteActivity extends Activity implements TvConnection.Ui {
             @Override
             public void afterTextChanged(android.text.Editable e) {
                 if (keyboardSyncing || !liveTyping()) return;
+                // This TV adds what it receives at the cursor, so send only the change:
+                // Delete presses for removed letters, then the new letters.
                 String t = e.toString();
-                conn.send(s -> s.text(t));
+                String before = sentText;
+                int p = 0;
+                while (p < before.length() && p < t.length() && before.charAt(p) == t.charAt(p)) p++;
+                int dels = before.length() - p;
+                String add = t.substring(p);
+                sentText = t;
+                conn.send(s -> {
+                    for (int i = 0; i < dels; i++) s.key(Keys.DEL, RemoteSession.SHORT);
+                    if (!add.isEmpty()) s.text(add);
+                });
                 updateKeyboardNote(true);
             }
         });
