@@ -154,11 +154,16 @@ public final class MouseClient {
         closed = true;
         ready = false;
         Socket s = socket;
-        if (s != null) {
+        if (s == null) return;
+        // Closing a TLS socket sends a goodbye message, which Android forbids on the
+        // main thread, so close it in the background.
+        Thread t = new Thread(() -> {
             try {
                 s.close();
-            } catch (IOException ignored) {
+            } catch (Exception ignored) {
             }
-        }
+        }, "socket-close");
+        t.setDaemon(true);
+        t.start();
     }
 }
